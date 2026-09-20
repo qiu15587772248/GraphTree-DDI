@@ -36,11 +36,61 @@ import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
 
-from graphtree_ddi.paths import DATA_RAW  # noqa: E402
+import argparse
+import re
+import unicodedata
+
+from graphtree_ddi.paths import DATA_PROCESSED, DATA_RAW  # noqa: E402
 RAW_DIR = DATA_RAW
 
 DRUGBANK_XML = RAW_DIR / "full database.xml"
 STRUCTURES_SDF = RAW_DIR / "structures.sdf"
+
+_CJK_RE = re.compile(r"[\u3400-\u9fff]")
+
+
+def _normalize_alias(value: str) -> str:
+    text = unicodedata.normalize("NFKC", str(value or "")).casefold()
+    text = text.replace("–", "-").replace("—", "-").replace("−", "-")
+    text = re.sub(r"[®™]", "", text)
+    text = re.sub(r"[\(\)\[\]\{\},.;:]", " ", text)
+    text = re.sub(r"[-_/]+", " ", text)
+    return " ".join(text.split())
+
+
+def _collect_name_rows(drug_elem, ns: dict, db_id: str, primary: str, atc: str):
+    """Build alias / i18n rows from synonyms and international-brands."""
+    aliases: list[dict[str, str]] = []
+    seen: set[str] = set()
+    names_cn: list[str] = []
+
+    def add_alias(raw: str) -> None:
+        alias = (raw or "").strip()
+        if not alias or alias in seen:
+            return
+        seen.add(alias)
+        aliases.append({
+            "drugbank_id": db_id,
+            "primary_name": primary,
+            "alias": alias,
+            "alias_normalized": _normalize_alias(alias),
+            "atc_codes": atc,
+        })
+        if _CJK_RE.search(alias):
+            names_cn.append(alias)
+
+    add_alias(primary)
+    for syn in drug_elem.findall("./db:synonyms/db:synonym", ns):
+        add_alias(syn.text or "")
+    for brand in drug_elem.findall("./db:international-brands/db:international-brand/db:name", ns):
+        add_alias(brand.text or "")
+
+    i18n = {
+        "drugbank_id": db_id,
+        "name_en": primary,
+        "name_cn": names_cn[0] if names_cn else "",
+    }
+    return aliases, i18n
 
 
 
@@ -120,7 +170,8 @@ def parse_smiles_from_sdf(sdf_path: Path = STRUCTURES_SDF) -> dict:
 # Step 2：解析 DrugBank XML
 # ─────────────────────────────────────────────────
 def parse_drugbank_xml(xml_path: Path = DRUGBANK_XML,
-                       smiles_map: dict = None) -> tuple:
+                       smiles_map: dict = None,
+                       export_name_tables: bool = False) -> tuple:
     """
     解析 full database.xml，提取：
       - 药物信息表 (drugs_df)
@@ -144,6 +195,8 @@ def parse_drugbank_xml(xml_path: Path = DRUGBANK_XML,
 
     ns = {"db": "http://www.drugbank.ca"}
     drugs, interactions = [], []
+    alias_rows: list[dict[str, str]] = []
+    i18n_rows: list[dict[str, str]] = []
 
     print(f"\n解析 {xml_path.name}（文件较大，约需 5-15 分钟）...")
     context = etree.iterparse(
@@ -152,20 +205,31 @@ def parse_drugbank_xml(xml_path: Path = DRUGBANK_XML,
     )
 
     for _, drug_elem in tqdm(context, desc="解析药物条目"):
-        # 只处理小分子药物
-        if drug_elem.get("type") != "small molecule":
-            drug_elem.clear()
-            continue
-
         db_id_elem = drug_elem.find("db:drugbank-id[@primary='true']", ns)
         if db_id_elem is None:
             drug_elem.clear()
             continue
         db_id = db_id_elem.text
 
-        # 药物名称
         name_elem = drug_elem.find("db:name", ns)
         name = name_elem.text if name_elem is not None else ""
+
+        atc_codes_early = [
+            e.get("code", "")
+            for e in drug_elem.findall(".//db:atc-code", ns)
+        ]
+        atc_joined = "|".join(atc_codes_early)
+        if export_name_tables:
+            a_rows, i_row = _collect_name_rows(
+                drug_elem, ns, db_id, name, atc_joined,
+            )
+            alias_rows.extend(a_rows)
+            i18n_rows.append(i_row)
+
+        # Feature / DDI tables stay small-molecule only (paper pipeline).
+        if drug_elem.get("type") != "small molecule":
+            drug_elem.clear()
+            continue
 
         # SMILES：优先用SDF，否则从XML提取
         smiles = smiles_map.get(db_id, "")
@@ -295,13 +359,23 @@ def parse_drugbank_xml(xml_path: Path = DRUGBANK_XML,
     print(f"       DDI记录总数:          {len(ddi_df):>8,}")
     print(f"{'='*55}")
 
+    if export_name_tables:
+        DATA_PROCESSED.mkdir(parents=True, exist_ok=True)
+        alias_path = DATA_PROCESSED / "drugbank_name_aliases.csv"
+        i18n_path = DATA_PROCESSED / "drugbank_name_i18n.csv"
+        pd.DataFrame(alias_rows).to_csv(alias_path, index=False, encoding="utf-8")
+        pd.DataFrame(i18n_rows).to_csv(i18n_path, index=False, encoding="utf-8")
+        print(f"  [name tables] aliases {len(alias_rows):,} → {alias_path}")
+        print(f"  [name tables] i18n    {len(i18n_rows):,} → {i18n_path}")
+        print("  这些表含 DrugBank 名称，受学术许可约束，请勿再分发。")
+
     return drugs_df, ddi_df
 
 
 # ─────────────────────────────────────────────────
 # 主函数
 # ─────────────────────────────────────────────────
-def run():
+def run(export_name_tables: bool = False):
     print("=" * 55)
     print("  DrugBank 完整数据解析")
     print("=" * 55)
@@ -310,10 +384,22 @@ def run():
     smiles_map = parse_smiles_from_sdf()
 
     # Step 2: 解析 XML（传入 smiles_map 避免重复提取）
-    drugs_df, ddi_df = parse_drugbank_xml(smiles_map=smiles_map)
+    drugs_df, ddi_df = parse_drugbank_xml(
+        smiles_map=smiles_map,
+        export_name_tables=export_name_tables,
+    )
 
-    print(f"\n✅ 解析完成，可以运行 preprocess.py")
+    print(f"\n解析完成，可以运行 preprocess.py")
 
 
 if __name__ == "__main__":
-    run()
+    p = argparse.ArgumentParser(description="Parse DrugBank XML/SDF into CSV tables")
+    p.add_argument(
+        "--export-name-tables",
+        action="store_true",
+        help="Also write drugbank_name_aliases.csv and drugbank_name_i18n.csv "
+             "under data/processed/ from XML synonyms / international-brands "
+             "(all drug types; not redistributable).",
+    )
+    args = p.parse_args()
+    run(export_name_tables=args.export_name_tables)

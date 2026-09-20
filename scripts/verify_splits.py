@@ -13,11 +13,16 @@ import pandas as pd
 
 _REPO = Path(__file__).resolve().parents[1]
 DEFAULT_SPLITS = _REPO / "splits" / "pair_splits.csv.gz"
+HASH_HEX_LEN = 32  # first 128 bits of SHA-256
 
 
 def canonical_hash(a: str, b: str) -> str:
+    """sha256(min|max) hex, truncated to 32 characters (128 bits).
+
+    Birthday-bound collision chance at n ≈ 1.3e6 is ~ n² / 2^{129} ≈ 10^{-27}.
+    """
     x, y = (str(a), str(b)) if str(a) < str(b) else (str(b), str(a))
-    return hashlib.sha256(f"{x}|{y}".encode("ascii")).hexdigest()
+    return hashlib.sha256(f"{x}|{y}".encode("ascii")).hexdigest()[:HASH_HEX_LEN]
 
 
 def pick_cols(df: pd.DataFrame) -> tuple[str, str]:
@@ -46,15 +51,16 @@ def main(argv=None) -> int:
     opener = gzip.open if str(args.splits).endswith(".gz") else open
     with opener(args.splits, "rt", encoding="utf-8") as f:
         manifest = pd.read_csv(f, dtype={"pair_hash": str})
-    known = set(manifest["pair_hash"].tolist())
+    known = set(manifest["pair_hash"].astype(str).str[:HASH_HEX_LEN].tolist())
     hit = sum(1 for h in hashes if h in known)
     n = len(hashes)
     rate = hit / n if n else 0.0
-    print(f"user_pairs	{n}")
-    print(f"manifest_rows	{len(manifest)}")
-    print(f"matched	{hit}")
-    print(f"unmatched	{n - hit}")
-    print(f"match_rate	{rate:.6f}")
+    print(f"user_pairs\t{n}")
+    print(f"manifest_rows\t{len(manifest)}")
+    print(f"matched\t{hit}")
+    print(f"unmatched\t{n - hit}")
+    print(f"match_rate\t{rate:.6f}")
+    print(f"hash_hex_len\t{HASH_HEX_LEN}")
     if args.out:
         out = pd.DataFrame({
             c1: pairs[c1],
@@ -64,7 +70,7 @@ def main(argv=None) -> int:
         })
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         out.to_csv(args.out, index=False)
-        print(f"wrote	{args.out}")
+        print(f"wrote\t{args.out}")
     return 0 if hit == n and n else (0 if n == 0 else 1)
 
 

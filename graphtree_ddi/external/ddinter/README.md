@@ -70,10 +70,20 @@ Level 分布（主表）：
 
 ## 3. 药名 → DrugBank ID 映射规则
 
-项目对照表（只读）：
+项目对照表（**不随仓库分发**；须用你自己许可的 DrugBank 5.1.15 XML 生成）：
 
 - `data/processed/drugbank_name_aliases.csv`（`drugbank_id, primary_name, alias, alias_normalized, atc_codes`）
 - `data/processed/drugbank_name_i18n.csv`（`drugbank_id, name_en, name_cn`）
+
+从 XML 的 `<synonym>` 与 `<international-brands>/<international-brand>/<name>`
+导出（主名写入 `name_en`；含 CJK 的别名写入 `name_cn`）：
+
+```bash
+python -m graphtree_ddi.data.download_data --export-name-tables
+```
+
+也可按同一列格式自行从 synonyms / international-brands 建表。这些表含 DrugBank
+名称，受 DrugBank 学术许可约束，请勿再分发。
 
 匹配顺序（大小写不敏感；一名称对应多个 DrugBank ID 则视为歧义，不自动选取）：
 

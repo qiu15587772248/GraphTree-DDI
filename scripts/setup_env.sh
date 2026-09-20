@@ -117,6 +117,7 @@ fi
 # 其余依赖（XGBoost 官方 wheel 含 GPU；流水线使用 device=cuda, tree_method=hist）
 # ---------------------------------------------------------------------------
 echo "[pip] scientific stack"
+# scikit-learn 1.5.2 is the pin; 1.6.x also reproduces the split counts
 $PYTHON -m pip install \
   "numpy>=1.26,<2.1" \
   pandas \

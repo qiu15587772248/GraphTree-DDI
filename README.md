@@ -31,9 +31,8 @@ data/processed/   # you generate features here (not shipped)
 - On a Linux CUDA host, `bash scripts/setup_env.sh` installs a pinned stack
   (PyTorch 2.4.1 + PyG 2.6.1 + XGBoost 2.1.3). Override the channel with
   `CUDA_CHANNEL=cu118` or `cu124` if needed.
-- Pair-split regeneration used scikit-learn 1.6.1; `setup_env.sh` pins 1.5.2.
-  Fold counts should still match `splits/README.md`; if they differ, install
-  1.6.1 before comparing hashes.
+- scikit-learn is pinned at **1.5.2** (`requirements.txt` and
+  `scripts/setup_env.sh`). 1.6.x also reproduces the split counts.
 
 ```bash
 conda create -n graphtree_ddi python=3.10 -y
@@ -57,6 +56,8 @@ Then, from the repository root:
 ```bash
 export PYTHONIOENCODING=utf-8
 python -m graphtree_ddi.data.download_data
+# optional, for DDInter name mapping:
+# python -m graphtree_ddi.data.download_data --export-name-tables
 python -m graphtree_ddi.data.preprocess
 python -m graphtree_ddi.data.build_v2 \
   --input-dir data/processed \
@@ -78,7 +79,11 @@ python scripts/verify_splits.py --pairs data/processed/v2/pairs.csv
 ```
 
 Node order for fingerprints (DrugBank ID + integer index only) is
-`resources/drug_index.csv`.
+`resources/drug_index.csv`. The supervised pair table spans 14,615 drugs
+(`resources/drug_index.csv`), whereas the knowledge-graph encoder builds
+nodes from the full `drugbank_drugs.csv` produced by preprocessing (15,485
+drugs in DrugBank 5.1.15), so uncatalogued drugs exist as nodes without
+DDI edges.
 
 ## Reproduce experiments
 
@@ -171,6 +176,13 @@ python -u -m graphtree_ddi.models.baselines.run_baselines \
 
 See `graphtree_ddi/models/baselines/README.md` for `--help` details (`--preload`,
 `--kge_entity`, smoke mode).
+
+### Ablations (optional)
+
+```bash
+python scripts/ablation/gnn_dim_sweep.py --dims 256 512 1024 2048
+python scripts/ablation/gnn_ablation.py --all
+```
 
 ### Paired bootstrap, tables, figures
 

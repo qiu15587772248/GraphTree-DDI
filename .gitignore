@@ -1,0 +1,28 @@
+# DrugBank and other licensed raw/processed tables (do not redistribute)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# Arrays, checkpoints, predictions
+*.npy
+*.npz
+*.dat
+*.pt
+*.pth
+*.pkl
+*.json.gz
+
+# Run outputs
+results/*
+!results/.gitkeep
+logs/
+
+# Python / editor
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+.env
+*.egg-info/
+.DS_Store

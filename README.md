@@ -197,6 +197,17 @@ python -m graphtree_ddi.analysis.paired_bootstrap_severity \
   --pred_dir results/final_v2_pair_merged results/baselines_v2_pair results/prior_baseline \
   --out_dir results/analysis
 
+# high-tier operating curve (Supplementary Table S3f)
+python -m graphtree_ddi.analysis.threshold_curve \
+  --pred_dir results/final_v2_pair_merged results/baselines_v2_pair \
+  --out_dir results/analysis
+
+# drug-clustered bootstrap of severity-only Macro-F1 (Supplementary Table S3e note)
+python -m graphtree_ddi.analysis.cluster_bootstrap \
+  --pred_dir results/final_v2_pair_merged results/baselines_v2_pair \
+  --data_dir data/processed/v2 \
+  --out_dir results/analysis
+
 # or call modules directly — check --help on each host
 python -m graphtree_ddi.analysis.paired_bootstrap --help
 python -m graphtree_ddi.analysis.plot_figures --help

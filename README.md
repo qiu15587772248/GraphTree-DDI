@@ -192,6 +192,11 @@ python -u -m graphtree_ddi.analysis.make_all \
              results/final_v2_drug results/baselines_v2_drug \
   --out_dir results/analysis
 
+# severity-only Macro-F1 / QWK paired bootstrap (Table 6, Supplementary Table S3e)
+python -m graphtree_ddi.analysis.paired_bootstrap_severity \
+  --pred_dir results/final_v2_pair_merged results/baselines_v2_pair results/prior_baseline \
+  --out_dir results/analysis
+
 # or call modules directly — check --help on each host
 python -m graphtree_ddi.analysis.paired_bootstrap --help
 python -m graphtree_ddi.analysis.plot_figures --help

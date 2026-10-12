@@ -223,7 +223,7 @@ checkout, use `--help` rather than guessing.
 Class-conditional (Mondrian) split-conformal thresholds for catalogued pairs, and
 drug-level conformal risk control for pairs with one uncatalogued drug. Each saved
 run is split R = 100 times into calibration and evaluation (master seed 20261012).
-The tables feed manuscript Tables 8–9 and Supplementary Section S9; Figure 7 is
+The tables feed manuscript Tables 8–9 and Supplementary Section S9; Figure 5 is
 drawn from those tables. DrugBank-derived labels and prediction files are not in
 this repository. `--labels` and `--pairs` override `y.npy` and `pairs.csv` inside
 `--data_dir`. `make_all.py --conformal` runs the same analysis into `--out_dir`

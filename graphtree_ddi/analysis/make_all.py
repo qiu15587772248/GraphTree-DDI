@@ -1,5 +1,7 @@
 """一键：多目录合并 → 汇总表、论文图、配对 bootstrap、外部评估 demo。
 
+共形药师转诊默认不跑（R = 100）。需要时加 ``--conformal``，写入同一个 ``--out_dir``。
+
 冒烟:
   python -u models/analysis/make_all.py \\
     --pred_dir models/results/baselines_smoke models/results/final_smoke_pair \\
@@ -51,6 +53,8 @@ def run_all(
     external_csv: str | Path | None = None,
     skip_bootstrap: bool = False,
     skip_external: bool = False,
+    run_conformal: bool = False,
+    conformal_repeats: int = 100,
     labels: dict[str, str] | None = None,
 ) -> dict:
     out_dir = Path(out_dir)
@@ -60,13 +64,13 @@ def run_all(
     tab_dir.mkdir(parents=True, exist_ok=True)
     labels = labels if labels is not None else M.DEFAULT_METHOD_LABELS
 
-    print("== 1/4 summarize_runs ==")
+    print("== 1/5 summarize_runs ==")
     SR.write_tables(pred_dir, tab_dir, labels=labels)
 
-    print("== 2/4 plot_figures ==")
+    print("== 2/5 plot_figures ==")
     PF.plot_all(pred_dir, fig_dir, data_dir=data_dir, labels=labels)
 
-    print("== 3/4 paired_bootstrap ==")
+    print("== 3/5 paired_bootstrap ==")
     if skip_bootstrap:
         print("  skipped")
     else:
@@ -110,7 +114,7 @@ def run_all(
                 PB.write_merged_tables(summary, tab_dir / "paired_bootstrap.md")
                 print(f"  → {boot_csv}  comparators={list(summary['method_b'])}")
 
-    print("== 4/4 external_eval ==")
+    print("== 4/5 external_eval ==")
     if skip_external:
         print("  skipped")
     elif external_csv:
@@ -126,6 +130,23 @@ def run_all(
             encoding="utf-8",
         )
         EE.run_external(csv_path, demo, test_data=True)
+
+    print("== 5/5 conformal_referral ==")
+    if not run_conformal:
+        print("  skipped")
+    else:
+        from graphtree_ddi.analysis.conformal_referral import main as conformal_main
+
+        cmd = [
+            "--pred_dir", *[str(p) for p in pred_dir],
+            "--out_dir", str(out_dir),
+            "--R", str(conformal_repeats),
+        ]
+        if data_dir:
+            cmd.extend(["--data_dir", str(data_dir)])
+        rc = conformal_main(cmd)
+        if rc:
+            raise SystemExit(rc)
 
     print(f"[make_all] done → {out_dir}")
     return dict(out_dir=out_dir, figures=fig_dir, tables=tab_dir)
@@ -147,6 +168,11 @@ def parse_args(argv=None):
     p.add_argument("--external_csv", default="")
     p.add_argument("--skip_bootstrap", action="store_true")
     p.add_argument("--skip_external", action="store_true")
+    p.add_argument(
+        "--conformal", action="store_true",
+        help="also run conformal referral into --out_dir (R=100; off by default)",
+    )
+    p.add_argument("--conformal_R", type=int, default=100)
     M.add_method_names_arg(p)
     return p.parse_args(argv)
 
@@ -161,6 +187,8 @@ def main(argv=None):
         external_csv=args.external_csv or None,
         skip_bootstrap=args.skip_bootstrap,
         skip_external=args.skip_external,
+        run_conformal=args.conformal,
+        conformal_repeats=args.conformal_R,
         labels=M.parse_method_names(args.method_names),
     )
 

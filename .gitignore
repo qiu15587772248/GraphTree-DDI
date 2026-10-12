@@ -18,6 +18,14 @@ results/*
 !results/.gitkeep
 logs/
 
+# Conformal referral products (also ignored when written under results/)
+conformal_transductive.csv
+conformal_inductive.csv
+conformal_summary.md
+conformal_raw.json
+fig_conformal.png
+fig_conformal.pdf
+
 # Python / editor
 __pycache__/
 *.py[cod]

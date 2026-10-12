@@ -14,7 +14,7 @@ redistributed.**
 graphtree_ddi/
   data/           # XML/SDF parse, pair features, v2 rebuild, phrase map
   models/         # R-GCN / R-GAT, Exp-1–5 pipeline, pair inference, baselines
-  analysis/       # metrics, paired bootstrap, tables, figures, SHAP helpers
+  analysis/       # metrics, paired bootstrap, conformal referral, tables, figures, SHAP helpers
   external/ddinter/   # DDInter download / clean / map / crosstab / inference
 scripts/          # environment, GPU runners, split verification
 resources/        # phrase_map_184.csv, PHRASE_MAP_RULES.md, drug_index.csv
@@ -214,9 +214,32 @@ python -m graphtree_ddi.analysis.plot_figures --help
 python -m graphtree_ddi.analysis.summarize_runs --help
 ```
 
-`make_all.py` / `paired_bootstrap.py` expect prediction `*.npz` written by the
-pipeline. If a flag name differs on your checkout, use `--help` rather than
-guessing.
+`make_all.py`, `paired_bootstrap.py` and `conformal_referral.py` expect
+prediction `*.npz` written by the pipeline. If a flag name differs on your
+checkout, use `--help` rather than guessing.
+
+### Conformal pharmacist referral
+
+Class-conditional (Mondrian) split-conformal thresholds for catalogued pairs, and
+drug-level conformal risk control for pairs with one uncatalogued drug. Each saved
+run is split R = 100 times into calibration and evaluation (master seed 20261012).
+The tables feed manuscript Tables 8–9 and Supplementary Section S9; Figure 7 is
+drawn from those tables. DrugBank-derived labels and prediction files are not in
+this repository. `--labels` and `--pairs` override `y.npy` and `pairs.csv` inside
+`--data_dir`. `make_all.py --conformal` runs the same analysis into `--out_dir`
+(off unless that flag is set).
+
+```bash
+python -m graphtree_ddi.analysis.conformal_referral \
+  --pred_dir results/final_v2_pair_merged results/baselines_v2_pair results/prior_baseline \
+             results/final_v2_drug results/baselines_v2_drug \
+  --data_dir data/processed/v2 \
+  --out_dir results/analysis
+
+python -m graphtree_ddi.analysis.plot_conformal \
+  --in_dir results/analysis \
+  --out_dir results/analysis
+```
 
 ### Smoke (not for manuscript numbers)
 
@@ -277,4 +300,4 @@ share-alike).
 
 Citation: manuscript under review; will be added upon publication.
 
-This repository is anonymized for peer review.
+The accompanying manuscript is under single-anonymized review.

@@ -1,0 +1,14 @@
+{
+  "Exp-1": "XGBoost (handcrafted)",
+  "Exp-2": "R-GCN (DDI-only)",
+  "Exp-3": "R-GCN (hybrid KG)",
+  "Exp-4": "R-GAT (hybrid KG)",
+  "Exp-5": "GraphTree-DDI (ours)",
+  "MLP": "MLP",
+  "DDIMDL": "DDIMDL-style",
+  "DeepDDI_SSP": "DeepDDI-style (SSP)",
+  "DistMult": "DistMult",
+  "ComplEx": "ComplEx",
+  "DrugPrior": "Drug-prior baseline (B3)",
+  "B3": "Drug-prior baseline (B3)"
+}
